@@ -169,7 +169,7 @@
 
 <div class="help">
   <div><b>拖拽 / 滑动</b> 旋转地球</div>
-  <div><b>滚轮 / 捏合</b> 缩放</div>
+  <div><b>捏合 / 双击</b> 缩放</div>
   <div><b>点击光点</b> 查看记录</div>
 </div>
 
@@ -378,10 +378,9 @@ renderer.domElement.addEventListener('touchend',onUp);
 renderer.domElement.addEventListener('wheel',e=>{
   e.preventDefault();autoSpin=false;
   if(e.ctrlKey){dist+=e.deltaY*0.02;dist=Math.max(4.2,Math.min(12,dist));return;}
-  const ax=Math.abs(e.deltaX),ay=Math.abs(e.deltaY);
-  if(ax>0.5&&ax>=ay*0.6){
-    target.y+=e.deltaX*0.0045;target.x+=e.deltaY*0.0045;target.x=Math.max(-1.2,Math.min(1.2,target.x));
-  }else{dist+=e.deltaY*0.01;dist=Math.max(4.2,Math.min(12,dist));}
+  target.y+=e.deltaX*0.0045;
+  target.x+=e.deltaY*0.0045;
+  target.x=Math.max(-1.2,Math.min(1.2,target.x));
 },{passive:false});
 
 let pinch=0;
@@ -391,6 +390,12 @@ renderer.domElement.addEventListener('touchmove',e=>{
     if(pinch){dist+=(pinch-d)*0.02;dist=Math.max(4.2,Math.min(12,dist));}pinch=d;}
 },{passive:true});
 renderer.domElement.addEventListener('touchend',()=>pinch=0);
+
+// 双击缩放（给没有触控板的鼠标用户一个缩放途径）
+renderer.domElement.addEventListener('dblclick',()=>{
+  autoSpin=false;
+  dist = dist>5.6 ? 4.6 : 7.6;
+});
 
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
 function ndc(p){mouse.x=(p.x/W)*2-1;mouse.y=-(p.y/H)*2+1;}
