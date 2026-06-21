@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>旅迹 · 我的旅行手账</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Long+Cang&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f3ead6;
+    --paper-dark:#e7d9bd;
+    --ink:#3a3226;
+    --ink-soft:#6b5d47;
+    --kraft:#c9a878;
+    --kraft-dark:#a8835a;
+    --wash-teal:#5b8a8c;
+    --wash-rose:#c17b6a;
+    --wash-gold:#d9a441;
+    --tape:rgba(216,196,150,.55);
+    --shadow:rgba(58,50,38,.22);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
+    font-family:'Caveat','Long Cang',cursive;}
+  /* paper grain overlay */
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;mix-blend-mode:multiply;opacity:.5;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(180,150,100,.08), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(140,110,70,.08), transparent 45%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");}
+
+  #scene{position:fixed;inset:0;z-index:1;}
+  canvas{display:block;}
+
+  /* ---- masthead ---- */
+  header{position:fixed;top:0;left:0;right:0;z-index:10;padding:18px 22px;display:flex;
+    align-items:baseline;gap:14px;pointer-events:none;}
+  .logo{font-family:'Ma Shan Zheng',cursive;font-size:34px;letter-spacing:2px;color:var(--ink);
+    text-shadow:1px 1px 0 rgba(255,255,255,.4);}
+  .sub{font-size:19px;color:var(--ink-soft);transform:rotate(-2deg);}
+  .count{margin-left:auto;pointer-events:auto;font-size:18px;color:var(--ink-soft);
+    background:var(--tape);padding:4px 14px;transform:rotate(1.5deg);
+    box-shadow:1px 2px 4px var(--shadow);}
+
+  /* ---- toolbar ---- */
+  .toolbar{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;justify-content:center;
+    gap:14px;padding:20px;pointer-events:none;flex-wrap:wrap;}
+  .btn{pointer-events:auto;cursor:pointer;border:none;font-family:'Caveat',cursive;font-size:21px;
+    color:var(--ink);background:var(--paper-dark);padding:11px 22px;border-radius:2px;
+    box-shadow:2px 3px 6px var(--shadow);transition:transform .15s,box-shadow .15s;
+    border:1.5px solid var(--kraft-dark);position:relative;}
+  .btn::before{content:"";position:absolute;top:-9px;left:50%;width:42px;height:16px;
+    transform:translateX(-50%) rotate(-3deg);background:var(--tape);box-shadow:0 1px 2px var(--shadow);}
+  .btn:hover{transform:translateY(-2px) rotate(-1deg);box-shadow:3px 5px 9px var(--shadow);}
+  .btn:active{transform:translateY(0);}
+  .btn.primary{background:var(--wash-teal);color:#f6efe0;border-color:#3f6566;}
+
+  /* ---- modal / card shared ---- */
+  .scrim{position:fixed;inset:0;z-index:30;background:rgba(40,33,22,.45);
+    backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;padding:20px;}
+  .scrim.show{display:flex;}
+
+  /* ---- journal card (view a place) ---- */
+  .card{background:var(--paper);width:min(440px,94vw);max-height:88vh;overflow-y:auto;
+    border-radius:3px;box-shadow:0 18px 50px rgba(30,22,10,.4);padding:26px 26px 30px;
+    position:relative;transform:rotate(-.6deg);border:1px solid var(--kraft);}
+  .card::-webkit-scrollbar{width:8px;}
+  .card::-webkit-scrollbar-thumb{background:var(--kraft);border-radius:8px;}
+  .stamp{position:absolute;top:14px;right:18px;font-family:'Ma Shan Zheng',cursive;
+    color:var(--wash-rose);border:2.5px solid var(--wash-rose);border-radius:50%;
+    width:64px;height:64px;display:flex;align-items:center;justify-content:center;text-align:center;
+    font-size:14px;line-height:1.1;transform:rotate(12deg);opacity:.8;padding:6px;}
+  .place-name{font-family:'Ma Shan Zheng',cursive;font-size:32px;margin:2px 0 0;}
+  .place-date{font-size:20px;color:var(--wash-teal);margin:2px 0 16px;}
+  .photos{display:flex;gap:12px;overflow-x:auto;padding:6px 2px 16px;scroll-snap-type:x mandatory;}
+  .polaroid{flex:0 0 auto;background:#fffdf7;padding:9px 9px 30px;box-shadow:3px 4px 10px var(--shadow);
+    transform:rotate(var(--r,-2deg));scroll-snap-align:center;}
+  .polaroid:nth-child(even){--r:2.2deg;}
+  .polaroid img{display:block;width:200px;height:150px;object-fit:cover;background:#ddd;}
+  .polaroid .cap{font-size:17px;text-align:center;color:var(--ink-soft);margin-top:6px;}
+  .note{font-family:'Long Cang',cursive;font-size:21px;line-height:1.5;color:var(--ink);
+    white-space:pre-wrap;margin-top:6px;
+    background:repeating-linear-gradient(transparent,transparent 33px,rgba(150,120,80,.25) 34px);
+    padding-bottom:4px;}
+  .card-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+  .link{cursor:pointer;font-size:18px;color:var(--ink-soft);text-decoration:underline dotted;
+    background:none;border:none;font-family:inherit;}
+  .link.danger{color:var(--wash-rose);}
+
+  /* ---- form ---- */
+  .form{background:var(--paper);width:min(480px,94vw);max-height:90vh;overflow-y:auto;
+    border-radius:3px;box-shadow:0 18px 50px rgba(30,22,10,.4);padding:26px;border:1px solid var(--kraft);}
+  .form h2{font-family:'Ma Shan Zheng',cursive;font-size:28px;margin:0 0 4px;}
+  .form p.hint{font-size:17px;color:var(--ink-soft);margin:0 0 18px;}
+  label{display:block;font-size:19px;margin:14px 0 4px;color:var(--ink);}
+  input[type=text],input[type=date],textarea{width:100%;font-family:'Caveat',cursive;font-size:20px;
+    color:var(--ink);background:#fffdf6;border:none;border-bottom:2px solid var(--kraft);
+    padding:7px 4px;outline:none;resize:vertical;}
+  input:focus,textarea:focus{border-color:var(--wash-teal);}
+  textarea{font-family:'Long Cang',cursive;font-size:20px;min-height:70px;}
+  .geo-row{display:flex;gap:10px;align-items:flex-end;}
+  .geo-row > div{flex:1;}
+  .geo-status{font-size:16px;color:var(--wash-teal);min-height:20px;margin-top:4px;}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .thumb{position:relative;width:64px;height:64px;border-radius:2px;overflow:hidden;
+    box-shadow:1px 2px 4px var(--shadow);}
+  .thumb img{width:100%;height:100%;object-fit:cover;}
+  .thumb button{position:absolute;top:1px;right:1px;background:var(--wash-rose);color:#fff;
+    border:none;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;}
+  .filepick{display:inline-block;cursor:pointer;font-size:18px;color:var(--wash-teal);
+    border:1.5px dashed var(--kraft-dark);padding:8px 14px;border-radius:3px;margin-top:6px;}
+  .filepick input{display:none;}
+  .form-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:22px;}
+
+  /* tooltip on hover over marker */
+  #tip{position:fixed;z-index:20;pointer-events:none;background:var(--ink);color:var(--paper);
+    font-size:16px;padding:3px 10px;border-radius:2px;transform:translate(-50%,-140%);
+    opacity:0;transition:opacity .12s;white-space:nowrap;box-shadow:1px 2px 5px var(--shadow);}
+
+  .hint-empty{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-3deg);
+    z-index:5;font-family:'Long Cang',cursive;font-size:24px;color:var(--ink-soft);
+    text-align:center;pointer-events:none;opacity:.85;}
+  .hidden{display:none!important;}
+
+  @media (max-width:520px){
+    .logo{font-size:27px;} .sub{font-size:16px;}
+    .btn{font-size:18px;padding:10px 16px;}
+  }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<header>
+  <span class="logo">旅迹</span>
+  <span class="sub">— 我去过的地方 —</span>
+  <span class="count" id="count">0 个地点</span>
+</header>
+
+<div class="hint-empty" id="emptyHint">地球还很空白<br>点下面「记一笔」，<br>把你去过的地方贴上去吧</div>
+
+<div class="toolbar">
+  <button class="btn primary" id="addBtn">＋ 记一笔</button>
+  <button class="btn" id="exportBtn">导出备份</button>
+  <label class="btn" style="cursor:pointer">导入备份
+    <input type="file" id="importInput" accept="application/json" style="display:none">
+  </label>
+</div>
+
+<div id="tip"></div>
+
+<!-- view card -->
+<div class="scrim" id="viewScrim">
+  <div class="card" id="viewCard"></div>
+</div>
+
+<!-- add/edit form -->
+<div class="scrim" id="formScrim">
+  <div class="form">
+    <h2 id="formTitle">记一笔</h2>
+    <p class="hint">填上地点和回忆，地球上就会亮起一盏灯。</p>
+    <label>地点名称</label>
+    <div class="geo-row">
+      <div>
+        <input type="text" id="fPlace" placeholder="比如：京都 / Paris / 大理">
+      </div>
+      <button class="btn" id="geoBtn" style="font-size:18px;padding:8px 14px">定位</button>
+    </div>
+    <div class="geo-status" id="geoStatus"></div>
+
+    <label>到访日期</label>
+    <input type="date" id="fDate">
+
+    <label>写点什么（心情、故事、想念的味道…）</label>
+    <textarea id="fNote" placeholder="那天的天气、遇到的人、吃到的东西…"></textarea>
+
+    <label>照片</label>
+    <label class="filepick">＋ 选择照片
+      <input type="file" id="fPhotos" accept="image/*" multiple>
+    </label>
+    <div class="thumbs" id="thumbs"></div>
+
+    <div class="form-actions">
+      <button class="link" id="cancelBtn">取消</button>
+      <button class="btn primary" id="saveBtn">贴上去</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   旅迹 Travel Journal Globe  —  single-file, localStorage only
+   ============================================================ */
+
+/* ---------- storage ---------- */
+const KEY = 'travel-journal-v1';
+let places = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||[] }catch(e){ return [] } }
+function save(){ localStorage.setItem(KEY, JSON.stringify(places)); refreshMarkers(); updateCount(); }
+function updateCount(){
+  document.getElementById('count').textContent = places.length + ' 个地点';
+  document.getElementById('emptyHint').classList.toggle('hidden', places.length>0);
+}
+
+/* ---------- three.js globe ---------- */
+const sceneEl = document.getElementById('scene');
+let W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(W,H);
+sceneEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, W/H, 0.1, 100);
+camera.position.set(0,0,7.6);
+
+const globe = new THREE.Group();
+scene.add(globe);
+
+const R = 2.4;
+
+/* watercolour earth texture, painted procedurally onto a canvas */
+function makeEarthTexture(){
+  const c = document.createElement('canvas'); c.width=2048; c.height=1024;
+  const x = c.getContext('2d');
+  // ocean wash
+  const og = x.createLinearGradient(0,0,0,1024);
+  og.addColorStop(0,'#cfe0dc'); og.addColorStop(.5,'#bcd4d2'); og.addColorStop(1,'#cfe0dc');
+  x.fillStyle=og; x.fillRect(0,0,2048,1024);
+  // soft watercolour blotches on ocean
+  for(let i=0;i<140;i++){
+    x.globalAlpha=Math.random()*.06+.02;
+    x.fillStyle = Math.random()<.5?'#9bbdbb':'#d8c79a';
+    const r=Math.random()*120+40;
+    x.beginPath();x.arc(Math.random()*2048,Math.random()*1024,r,0,7);x.fill();
+  }
+  x.globalAlpha=1;
+  // continents as rough equirectangular polygons (stylised, hand-painted feel)
+  const land = [
+    // [ [lon,lat], ... ]  very rough silhouettes
+    [[-168,65],[-150,68],[-120,60],[-95,49],[-80,42],[-82,28],[-97,18],[-105,23],[-117,32],[-125,40],[-130,55],[-160,58]], // N America
+    [[-82,12],[-70,8],[-55,-5],[-40,-12],[-48,-23],[-58,-34],[-70,-50],[-72,-30],[-78,-8],[-80,2]], // S America
+    [[-12,35],[5,37],[18,33],[33,31],[44,12],[51,12],[42,-2],[40,-16],[30,-30],[20,-34],[12,-22],[8,4],[-6,5],[-16,15],[-17,25]], // Africa
+    [[-10,44],[2,50],[12,55],[28,60],[40,68],[60,70],[50,55],[55,42],[44,40],[28,46],[14,46],[2,44]], // Europe
+    [[44,40],[60,55],[90,68],[120,72],[145,68],[170,66],[178,62],[150,52],[135,44],[122,40],[120,22],[105,12],[92,20],[78,8],[70,22],[60,30],[50,38]], // Asia
+    [[114,-12],[130,-12],[145,-18],[150,-28],[140,-38],[128,-32],[116,-34],[113,-22]], // Australia
+  ];
+  const colors=['#bcd0a8','#c9d39a','#b6c79a','#cdbf8e'];
+  land.forEach((poly,idx)=>{
+    x.beginPath();
+    poly.forEach((p,i)=>{
+      const px=(p[0]+180)/360*2048, py=(90-p[1])/180*1024;
+      i?x.lineTo(px,py):x.moveTo(px,py);
+    });
+    x.closePath();
+    x.fillStyle=colors[idx%colors.length];
+    x.globalAlpha=.92; x.fill();
+    // watercolour edge darkening
+    x.globalAlpha=.5; x.lineWidth=6; x.strokeStyle='#8a9b6e'; x.stroke();
+    x.globalAlpha=1;
+  });
+  // grain
+  for(let i=0;i<9000;i++){
+    x.globalAlpha=Math.random()*.05;
+    x.fillStyle=Math.random()<.5?'#6b5d47':'#ffffff';
+    x.fillRect(Math.random()*2048,Math.random()*1024,1.4,1.4);
+  }
+  x.globalAlpha=1;
+  const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
+}
+
+const earthMat = new THREE.MeshPhongMaterial({ map:makeEarthTexture(), shininess:3, specular:0x222222 });
+const earth = new THREE.Mesh(new THREE.SphereGeometry(R,72,72), earthMat);
+globe.add(earth);
+
+// soft paper-coloured atmosphere halo
+const halo = new THREE.Mesh(
+  new THREE.SphereGeometry(R*1.06,48,48),
+  new THREE.MeshBasicMaterial({color:0xe9dcc0, transparent:true, opacity:.18, side:THREE.BackSide})
+);
+globe.add(halo);
+
+// lights — warm, like an old lamp on a desk
+scene.add(new THREE.AmbientLight(0xfff4dd, .9));
+const key = new THREE.DirectionalLight(0xfff0d0, .7); key.position.set(5,3,5); scene.add(key);
+const rim = new THREE.DirectionalLight(0xa9c4c4, .35); rim.position.set(-5,-2,-4); scene.add(rim);
+
+/* ---------- markers ---------- */
+const markerGroup = new THREE.Group();
+globe.add(markerGroup);
+let markerMeshes = []; // {mesh, place}
+
+function latLonToVec(lat, lon, radius){
+  const phi=(90-lat)*Math.PI/180, theta=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -radius*Math.sin(phi)*Math.cos(theta),
+     radius*Math.cos(phi),
+     radius*Math.sin(phi)*Math.sin(theta)
+  );
+}
+
+function refreshMarkers(){
+  markerMeshes.forEach(m=>markerGroup.remove(m.mesh));
+  markerMeshes=[];
+  places.forEach(p=>{
+    const pos = latLonToVec(p.lat, p.lon, R+0.02);
+    const grp = new THREE.Group();
+    // ink dot
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045,16,16),
+      new THREE.MeshBasicMaterial({color:0xc17b6a})
+    );
+    // glow ring (sprite)
+    const ring = new THREE.Mesh(
+      new THREE.CircleGeometry(0.11,24),
+      new THREE.MeshBasicMaterial({color:0xd9a441, transparent:true, opacity:.55})
+    );
+    ring.lookAt(pos.clone().multiplyScalar(2));
+    grp.add(ring); grp.add(dot);
+    grp.position.copy(pos);
+    grp.userData = {place:p, base:0.11, ring};
+    markerGroup.add(grp);
+    markerMeshes.push({mesh:grp, place:p, ring});
+  });
+}
+refreshMarkers(); updateCount();
+
+/* ---------- interaction: drag-rotate + zoom + pick ---------- */
+let rot={x:0.2,y:0}, target={x:0.2,y:0}, dragging=false, last={x:0,y:0}, moved=0, autoSpin=true;
+let dist=7.6;
+
+function onDown(e){ dragging=true; moved=0; autoSpin=false; const p=pt(e); last=p; }
+function onMove(e){
+  const p=pt(e);
+  if(dragging){
+    const dx=p.x-last.x, dy=p.y-last.y; moved+=Math.abs(dx)+Math.abs(dy);
+    target.y += dx*0.005; target.x += dy*0.005;
+    target.x=Math.max(-1.2,Math.min(1.2,target.x)); last=p;
+  }
+  hover(p);
+}
+function onUp(e){
+  if(dragging && moved<6){ pick(pt(e)); }
+  dragging=false;
+}
+function pt(e){ const t=e.touches?e.touches[0]:e; return {x:t.clientX,y:t.clientY}; }
+
+renderer.domElement.addEventListener('mousedown',onDown);
+addEventListener('mousemove',onMove);
+addEventListener('mouseup',onUp);
+renderer.domElement.addEventListener('touchstart',onDown,{passive:true});
+renderer.domElement.addEventListener('touchmove',e=>{onMove(e);},{passive:true});
+renderer.domElement.addEventListener('touchend',onUp);
+renderer.domElement.addEventListener('wheel',e=>{
+  e.preventDefault(); dist+=e.deltaY*0.01; dist=Math.max(4.2,Math.min(12,dist));
+},{passive:false});
+
+// pinch zoom
+let pinch=0;
+renderer.domElement.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    if(pinch) { dist+= (pinch-d)*0.02; dist=Math.max(4.2,Math.min(12,dist)); }
+    pinch=d;
+  }
+},{passive:true});
+renderer.domElement.addEventListener('touchend',()=>pinch=0);
+
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
+function screenToNdc(p){ mouse.x=(p.x/W)*2-1; mouse.y=-(p.y/H)*2+1; }
+
+function pick(p){
+  screenToNdc(p); ray.setFromCamera(mouse,camera);
+  const hits=ray.intersectObjects(markerMeshes.map(m=>m.mesh),true);
+  if(hits.length){
+    let g=hits[0].object; while(g.parent && !g.userData.place) g=g.parent;
+    if(g.userData.place) openView(g.userData.place);
+  }
+}
+const tip=document.getElementById('tip');
+function hover(p){
+  screenToNdc(p); ray.setFromCamera(mouse,camera);
+  const hits=ray.intersectObjects(markerMeshes.map(m=>m.mesh),true);
+  if(hits.length){
+    let g=hits[0].object; while(g.parent && !g.userData.place) g=g.parent;
+    if(g.userData.place){
+      tip.textContent=g.userData.place.name; tip.style.left=p.x+'px'; tip.style.top=p.y+'px';
+      tip.style.opacity=1; renderer.domElement.style.cursor='pointer'; return;
+    }
+  }
+  tip.style.opacity=0; renderer.domElement.style.cursor='grab';
+}
+
+/* ---------- render loop ---------- */
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.016;
+  if(autoSpin) target.y+=0.0012;
+  rot.x+=(target.x-rot.x)*0.08; rot.y+=(target.y-rot.y)*0.08;
+  globe.rotation.x=rot.x; globe.rotation.y=rot.y;
+  camera.position.z += (dist-camera.position.z)*0.1;
+  // pulse marker rings
+  markerMeshes.forEach((m,i)=>{
+    const s=1+Math.sin(t*2+i)*0.18; m.ring.scale.set(s,s,s);
+    m.ring.material.opacity=0.35+Math.sin(t*2+i)*0.2;
+    m.ring.lookAt(camera.position);
+  });
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+  W=innerWidth;H=innerHeight;camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H);
+});
+
+/* ============================================================
+   UI: view card
+   ============================================================ */
+const viewScrim=document.getElementById('viewScrim');
+const viewCard=document.getElementById('viewCard');
+function fmtDate(d){ if(!d) return ''; const x=new Date(d+'T00:00'); if(isNaN(x))return d;
+  return x.getFullYear()+'年'+(x.getMonth()+1)+'月'+x.getDate()+'日'; }
+
+function openView(p){
+  const photos=(p.photos||[]).map((src,i)=>
+    `<figure class="polaroid"><img src="${src}" alt=""><figcaption class="cap">${p.name}</figcaption></figure>`
+  ).join('');
+  viewCard.innerHTML=`
+    <div class="stamp">${(p.date||'').slice(0,4)||'旅迹'}<br>已抵达</div>
+    <h3 class="place-name">${escapeHtml(p.name)}</h3>
+    <div class="place-date">${fmtDate(p.date)}</div>
+    ${photos?`<div class="photos">${photos}</div>`:''}
+    ${p.note?`<div class="note">${escapeHtml(p.note)}</div>`:''}
+    <div class="card-actions">
+      <button class="link" id="flyBtn">飞到这里</button>
+      <button class="link" id="editBtn">编辑</button>
+      <button class="link danger" id="delBtn">撕掉这页</button>
+    </div>`;
+  viewScrim.classList.add('show');
+  document.getElementById('delBtn').onclick=()=>{
+    if(confirm('确定撕掉「'+p.name+'」这一页吗？')){
+      places=places.filter(x=>x.id!==p.id); save(); viewScrim.classList.remove('show');
+    }
+  };
+  document.getElementById('editBtn').onclick=()=>{ viewScrim.classList.remove('show'); openForm(p); };
+  document.getElementById('flyBtn').onclick=()=>{ flyTo(p); viewScrim.classList.remove('show'); };
+}
+viewScrim.addEventListener('click',e=>{ if(e.target===viewScrim) viewScrim.classList.remove('show'); });
+
+function flyTo(p){
+  autoSpin=false;
+  target.y = -(p.lon+180)*Math.PI/180 - Math.PI/2;
+  target.x = p.lat*Math.PI/180;
+  target.x=Math.max(-1.2,Math.min(1.2,target.x));
+  dist=5.2;
+}
+
+/* ============================================================
+   UI: form (add / edit)
+   ============================================================ */
+const formScrim=document.getElementById('formScrim');
+let editingId=null, draftPhotos=[];
+
+function openForm(p){
+  editingId = p? p.id : null;
+  document.getElementById('formTitle').textContent = p? '编辑这一页' : '记一笔';
+  document.getElementById('fPlace').value = p? p.name : '';
+  document.getElementById('fDate').value = p? (p.date||'') : new Date().toISOString().slice(0,10);
+  document.getElementById('fNote').value = p? (p.note||'') : '';
+  draftPhotos = p? [...(p.photos||[])] : [];
+  draftGeo = p? {lat:p.lat, lon:p.lon} : null;
+  document.getElementById('geoStatus').textContent = p? `已定位：${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}` : '';
+  renderThumbs();
+  formScrim.classList.add('show');
+}
+document.getElementById('addBtn').onclick=()=>openForm(null);
+document.getElementById('cancelBtn').onclick=()=>formScrim.classList.remove('show');
+formScrim.addEventListener('click',e=>{ if(e.target===formScrim) formScrim.classList.remove('show'); });
+
+let draftGeo=null;
+document.getElementById('geoBtn').onclick=async()=>{
+  const name=document.getElementById('fPlace').value.trim();
+  if(!name){ document.getElementById('geoStatus').textContent='先填地点名称'; return; }
+  const st=document.getElementById('geoStatus'); st.textContent='查找坐标中…';
+  const local=lookupLocal(name);
+  if(local){ draftGeo=local; st.textContent=`已定位：${local.lat.toFixed(2)}, ${local.lon.toFixed(2)}`; return; }
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(name));
+    const j=await r.json();
+    if(j&&j[0]){ draftGeo={lat:+j[0].lat, lon:+j[0].lon};
+      st.textContent=`已定位：${draftGeo.lat.toFixed(2)}, ${draftGeo.lon.toFixed(2)}`; }
+    else st.textContent='没找到，换个写法试试（如加上国家名）';
+  }catch(e){ st.textContent='联网定位失败，可手动在常见城市里选，或稍后再试'; }
+};
+
+// offline fallback for common cities so 定位 works even without network
+const LOCAL={
+  '北京':[39.90,116.40],'上海':[31.23,121.47],'广州':[23.13,113.26],'成都':[30.57,104.07],
+  '大理':[25.61,100.27],'西安':[34.34,108.94],'杭州':[30.27,120.15],'重庆':[29.56,106.55],
+  '香港':[22.32,114.17],'台北':[25.03,121.57],'东京':[35.68,139.69],'京都':[35.01,135.77],
+  '大阪':[34.69,135.50],'首尔':[37.57,126.98],'曼谷':[13.76,100.50],'新加坡':[1.35,103.82],
+  '巴黎':[48.86,2.35],'伦敦':[51.51,-0.13],'罗马':[41.90,12.50],'纽约':[40.71,-74.01],
+  '旧金山':[37.77,-122.42],'洛杉矶':[34.05,-118.24],'悉尼':[-33.87,151.21],'冰岛':[64.13,-21.90],
+  'tokyo':[35.68,139.69],'paris':[48.86,2.35],'london':[51.51,-0.13],'new york':[40.71,-74.01],
+  'rome':[41.90,12.50],'kyoto':[35.01,135.77],'bangkok':[13.76,100.50],'sydney':[-33.87,151.21]
+};
+function lookupLocal(name){ const k=name.trim().toLowerCase(); 
+  for(const key in LOCAL){ if(key.toLowerCase()===k || name.includes(key)) return {lat:LOCAL[key][0],lon:LOCAL[key][1]}; }
+  return null; }
+
+document.getElementById('fPhotos').onchange=async e=>{
+  for(const file of e.target.files){
+    const data=await shrink(file); draftPhotos.push(data);
+  }
+  renderThumbs(); e.target.value='';
+};
+function renderThumbs(){
+  document.getElementById('thumbs').innerHTML=draftPhotos.map((src,i)=>
+    `<div class="thumb"><img src="${src}"><button data-i="${i}">×</button></div>`).join('');
+  document.querySelectorAll('.thumb button').forEach(b=>b.onclick=()=>{
+    draftPhotos.splice(+b.dataset.i,1); renderThumbs();
+  });
+}
+// downscale + compress photo to keep localStorage small
+function shrink(file){
+  return new Promise(res=>{
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=1000; let{width:w,height:h}=img;
+      if(w>h&&w>max){h=h*max/w;w=max;} else if(h>max){w=w*max/h;h=max;}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',0.78));
+    };
+    img.src=url;
+  });
+}
+
+document.getElementById('saveBtn').onclick=()=>{
+  const name=document.getElementById('fPlace').value.trim();
+  if(!name){ alert('给这个地方起个名字吧'); return; }
+  if(!draftGeo){ alert('点一下「定位」找到它在地球上的位置'); return; }
+  const rec={
+    id: editingId||('p'+Date.now()),
+    name, lat:draftGeo.lat, lon:draftGeo.lon,
+    date:document.getElementById('fDate').value,
+    note:document.getElementById('fNote').value.trim(),
+    photos:draftPhotos
+  };
+  if(editingId){ places=places.map(p=>p.id===editingId?rec:p); }
+  else places.push(rec);
+  try{ save(); }
+  catch(err){ alert('存储空间不足，照片太多或太大了，删掉几张再试'); return; }
+  formScrim.classList.remove('show');
+  flyTo(rec);
+};
+
+/* ============================================================
+   import / export
+   ============================================================ */
+document.getElementById('exportBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify(places,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='旅迹备份_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+};
+document.getElementById('importInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const data=JSON.parse(rd.result);
+      if(!Array.isArray(data)) throw 0;
+      if(confirm('导入会替换当前数据，确定吗？（先导出现有数据可备份）')){
+        places=data; save();
+        alert('导入成功，共 '+places.length+' 个地点');
+      }
+    }catch(err){ alert('文件格式不对，请选择「旅迹」导出的备份'); }
+    e.target.value='';
+  };
+  rd.readAsText(f);
+};
+
+/* ---------- util ---------- */
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
